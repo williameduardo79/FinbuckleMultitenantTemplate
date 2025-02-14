@@ -1,0 +1,78 @@
+﻿@page "/select-tenant"
+@using BlazorApp_FinbuckleMultitenantTest.Data
+@using BlazorApp_FinbuckleMultitenantTest.TenantData
+@using Microsoft.AspNetCore.Antiforgery
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@inject TenantDbContext TenantDbContext
+@inject NavigationManager Navigation
+@inject IAntiforgery AntiforgeryService
+@inject IHttpContextAccessor HttpContextAccessor
+
+<h3>Select Your Tenant</h3>
+
+@if (tenants == null)
+{
+    <p>Loading tenants...</p>
+}
+else
+{
+    @foreach (var tenant in tenants)
+    {
+        <button @onclick="() => SelectTenant(tenant.Identifier)">
+            @tenant.Name
+        </button>
+        <br />
+    }
+}
+
+@code {
+    private List<AppTenantInfo>? tenants;
+
+    protected override async Task OnInitializedAsync()
+    {
+        tenants = await TenantDbContext.Tenants.ToListAsync();
+    }
+
+    private void SelectTenant(string tenantIdentifier)
+    {
+        var uri = new Uri(Navigation.BaseUri);
+        var fullHost = uri.Host; // e.g., acme.localhost
+        var scheme = uri.Scheme;
+        var port = uri.IsDefaultPort ? "" : $":{uri.Port}";
+
+        // Extract the root domain (localhost)
+        var hostParts = fullHost.Split('.');
+        var rootDomain = hostParts.Length > 1 ? $"{hostParts[1]}" : $"{hostParts[0]}";
+
+        // Construct the new subdomain-based URL
+        var newUrl = $"{scheme}://{tenantIdentifier}.{rootDomain}{port}/Account/Login";
+        // Replace the antiforgery token before navigating
+       // ResetAntiforgeryToken();
+        Navigation.NavigateTo(newUrl, forceLoad: true);
+    }
+    private void ResetAntiforgeryToken()
+    {
+        var httpContext = HttpContextAccessor.HttpContext;
+        if (httpContext == null)
+        {
+            Console.WriteLine("⚠️ HttpContext is null, cannot reset antiforgery token.");
+            return;
+        }
+
+        // Delete existing antiforgery and authentication cookies
+        var antiforgeryCookieName = ".AspNetCore.Antiforgery"; // Default name, may vary per app config
+        httpContext.Response.Cookies.Delete(antiforgeryCookieName);
+        httpContext.Response.Cookies.Delete(".AspNetCore.Identity.Application");
+
+        // Generate and store a new antiforgery token
+        var tokens = AntiforgeryService.GetAndStoreTokens(httpContext);
+        if (!string.IsNullOrEmpty(tokens.RequestToken))
+        {
+            httpContext.Response.Cookies.Append(antiforgeryCookieName, tokens.RequestToken,
+                new CookieOptions { HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict });
+
+            Console.WriteLine("✅ Antiforgery token reset successfully.");
+        }
+    }
+}

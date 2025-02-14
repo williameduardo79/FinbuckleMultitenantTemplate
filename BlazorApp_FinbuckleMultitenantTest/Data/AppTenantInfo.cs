@@ -1,0 +1,13 @@
+﻿using Finbuckle.MultiTenant.Abstractions;
+
+namespace BlazorApp_FinbuckleMultitenantTest.Data
+{
+    public class AppTenantInfo : ITenantInfo
+    {
+        public string Id { get; set; } = default!;
+        public string Identifier { get; set; } = default!;
+        public string Name { get; set; } = default!;
+        public string ConnectionString { get; set; } = default!;
+        public virtual ICollection<UserTenant> UserTenants { get; set; } = new List<UserTenant>();
+    }
+}
