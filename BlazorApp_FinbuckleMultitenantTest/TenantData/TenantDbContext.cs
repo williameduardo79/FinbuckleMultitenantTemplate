@@ -11,14 +11,16 @@ namespace BlazorApp_FinbuckleMultitenantTest.TenantData
     public class TenantDbContext : DbContext
     {
         public TenantDbContext(DbContextOptions<TenantDbContext> options) : base(options) { }
-        // Explicitly add a DbSet for AppTenantInfo
-        public DbSet<AppTenantInfo> Tenants { get; set; } = default!;
+      
+        public DbSet<Product> Products { get; set; } = default!;
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
 
-            // Ensure AppTenantInfo is configured properly
-            builder.Entity<AppTenantInfo>().ToTable("Tenants");
+            builder.Entity<Product>()
+          .Property(p => p.Id)
+          .ValueGeneratedOnAdd();  // Ensures auto-increment behavior for `Id`
+
         }
     }
 

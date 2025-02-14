@@ -65,7 +65,7 @@ builder.Services.AddHttpContextAccessor();
 
 // Add the TenantDbContext for tenant-specific data access
 builder.Services.AddDbContext<TenantDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("TenantConnection")));
 
 //builder.Services.AddScoped<IMultiTenantStore<AppTenantInfo>, CustomTenantStore>();
 

@@ -4,8 +4,6 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 public class UserTenant
 {
-    [Key]
-    public int Id { get; set; }
 
     public string UserId { get; set; } = default!;
     [ForeignKey("UserId")]

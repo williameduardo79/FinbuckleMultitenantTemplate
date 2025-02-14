@@ -1,7 +1,11 @@
 ﻿@page "/auth"
 
+@using BlazorApp_FinbuckleMultitenantTest.Data
+@using BlazorApp_FinbuckleMultitenantTest.TenantData
+@using Finbuckle.MultiTenant.Abstractions
 @using Microsoft.AspNetCore.Authorization
-
+@using Microsoft.EntityFrameworkCore
+@inject IMultiTenantContextAccessor<AppTenantInfo> _tenantAccessor
 @attribute [Authorize]
 
 <PageTitle>Auth</PageTitle>
@@ -10,4 +14,60 @@
 
 <AuthorizeView>
     Hello @context.User.Identity?.Name!
+
+    <br />
+    You are in tenant @_tenantAccessor.MultiTenantContext.TenantInfo?.Name!
+    <br />
+    Connection String: @_tenantAccessor.MultiTenantContext.TenantInfo?.ConnectionString
+    <br />
+    <h2>Products:</h2>
+    @if (products == null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var product in products)
+                {
+                    <tr>
+                        <td>@product.Id</td>
+                        <td>@product.Name</td>
+                        <td>@product.Description</td>
+                        <td>@product.Price</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
 </AuthorizeView>
+@code{
+    private Product[]? products;
+    protected override async Task OnInitializedAsync()
+    {
+        var tenant = _tenantAccessor.MultiTenantContext.TenantInfo;
+        if(tenant != null)
+        {
+            var connectionString = tenant.ConnectionString;
+            // Use the tenant connection string to create the TenantDbContext
+            var optionsBuilder = new DbContextOptionsBuilder<TenantDbContext>()
+                .UseSqlServer(connectionString);
+
+            var tenantDbContext = new TenantDbContext(optionsBuilder.Options);
+
+            // Fetch products for the specific tenant
+            products = await tenantDbContext.Products.ToArrayAsync();
+            
+        }
+    }
+}

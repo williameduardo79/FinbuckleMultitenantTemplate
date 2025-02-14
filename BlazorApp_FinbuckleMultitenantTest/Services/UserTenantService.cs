@@ -13,12 +13,12 @@ namespace BlazorApp_FinbuckleMultitenantTest.Services
         }
 
         // Get a single UserTenant by Id
-        public async Task<UserTenant> GetUserTenantAsync(int id)
+        public async Task<UserTenant> GetUserTenantAsync(string userId, string tenantId)
         {
             return await _dbContext.UserTenants
                 .Include(ut => ut.User)
                 .Include(ut => ut.Tenant)
-                .FirstOrDefaultAsync(ut => ut.Id == id);
+                 .FirstOrDefaultAsync(ut => ut.UserId == userId && ut.TenantId == tenantId);
         }
 
         // Get all UserTenants
