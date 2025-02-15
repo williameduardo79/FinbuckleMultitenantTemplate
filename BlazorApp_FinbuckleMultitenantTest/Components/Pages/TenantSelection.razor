@@ -41,12 +41,14 @@ else
         var scheme = uri.Scheme;
         var port = uri.IsDefaultPort ? "" : $":{uri.Port}";
 
+        var tenant = tenants.SingleOrDefault(x => x.Identifier == tenantIdentifier);
+
         // Extract the root domain (localhost)
-        var hostParts = fullHost.Split('.');
-        var rootDomain = hostParts.Length > 1 ? $"{hostParts[1]}" : $"{hostParts[0]}";
+       // var hostParts = fullHost.Split('.');
+        //var rootDomain = hostParts.Length > 1 ? $"{hostParts[1]}" : $"{hostParts[0]}";
 
         // Construct the new subdomain-based URL
-        var newUrl = $"{scheme}://{tenantIdentifier}.{rootDomain}{port}/Account/Login";
+        var newUrl = $"{scheme}://{tenant.TenantAddress}{port}/Account/Login";
         // Replace the antiforgery token before navigating
        // ResetAntiforgeryToken();
         Navigation.NavigateTo(newUrl, forceLoad: true);

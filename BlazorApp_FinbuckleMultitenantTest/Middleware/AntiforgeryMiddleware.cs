@@ -23,9 +23,14 @@ namespace BlazorApp_FinbuckleMultitenantTest.Middleware
         {
             // Detect if tenant/user has changed
             var tenantChanged = context.Request.Cookies["TenantId"] != context.Session.GetString("TenantId");
+            var userChanged = context.User.Identity.Name != context.Session.GetString("UserName");
 
-            if (tenantChanged)
+            if (tenantChanged || userChanged)
             {
+                if (context.User.Identity.IsAuthenticated)
+                {
+                    context.Session.SetString("UserName", context.User.Identity.Name);  // Track the logged-in user
+                }
                 // Remove old token cookies
                 var antiforgeryCookieName = ".AspNetCore.Antiforgery"; // Default name, may vary per app config
                 context.Response.Cookies.Delete(antiforgeryCookieName);
@@ -36,14 +41,14 @@ namespace BlazorApp_FinbuckleMultitenantTest.Middleware
                 context.Response.Cookies.Append(antiforgeryCookieName, tokens.RequestToken,
                     new CookieOptions { HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict });
 
-                // Update session to track tenant change
+                // Update session to track tenant and user change
                 var tenantInfo = _tenantAccessor.MultiTenantContext?.TenantInfo;
                 if (tenantInfo != null)
                 {
                     context.Session.SetString("TenantId", tenantInfo.Identifier);
                 }
 
-                  
+               
             }
 
             await _next(context);

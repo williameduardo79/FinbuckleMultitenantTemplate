@@ -11,8 +11,12 @@ using Finbuckle.MultiTenant.Abstractions;
 using System.Security.Principal;
 using BlazorApp_FinbuckleMultitenantTest.Services;
 using BlazorApp_FinbuckleMultitenantTest.Middleware;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using BlazorApp_FinbuckleMultitenantTest.Configurations;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddMemoryCache(); // Register MemoryCache
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -23,14 +27,18 @@ builder.Services.AddScoped<IdentityUserAccessor>();
 builder.Services.AddScoped<IdentityRedirectManager>();
 builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 
-//builder.Services.AddScoped<SignInManager<ApplicationUser>, CustomSignInManager>();
 // Add authentication services before AddIdentity
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultScheme = IdentityConstants.ApplicationScheme;
-    options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
+    options.DefaultScheme = IdentityConstants.ApplicationScheme;  // This ensures the correct scheme is used
+    options.DefaultSignInScheme = IdentityConstants.ApplicationScheme; // Ensure the same for sign-in
 })
- .AddIdentityCookies();
+.AddCookie(IdentityConstants.ApplicationScheme, options =>
+{
+    options.Cookie.Name = ".AspNetCore.Identity";  // Set the cookie name here
+    options.Cookie.SameSite = SameSiteMode.Lax;
+});
+
 
 // Now, configure the ApplicationDbContext for your main application
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
@@ -50,16 +58,11 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
     .AddDefaultTokenProviders()
     .AddUserStore<MultiTenantUserStore>(); //Ensures token support (e.g., for password reset)
 
-//builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, UserClaimsPrincipalFactory<ApplicationUser, IdentityRole>>();
+
 builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, CustomUserClaimsPrincipalFactory>();
 builder.Services.AddScoped<IUserStore<ApplicationUser>, MultiTenantUserStore>();
 
-//Cookie middleware for tenant
-builder.Services.ConfigureApplicationCookie(options =>
-{
-    options.Cookie.Name = ".AspNetCore.Identity"; // Will be overridden in middleware
-    options.Cookie.SameSite = SameSiteMode.Lax;
-});
+
 
 builder.Services.AddHttpContextAccessor();
 
@@ -67,8 +70,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddDbContext<TenantDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("TenantConnection")));
 
-//builder.Services.AddScoped<IMultiTenantStore<AppTenantInfo>, CustomTenantStore>();
-
+//Finbuckle Multitenant
 builder.Services.AddMultiTenant<AppTenantInfo>()
     .WithStore<CustomTenantStore>(ServiceLifetime.Scoped)
     .WithHostStrategy();

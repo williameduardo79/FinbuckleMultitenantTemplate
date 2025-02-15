@@ -1,12 +1,18 @@
 ﻿@page "/Error"
 @using System.Diagnostics
+@inject NavigationManager Navigation
 
 <PageTitle>Error</PageTitle>
 
 <h1 class="text-danger">Error.</h1>
 <h2 class="text-danger">An error occurred while processing your request.</h2>
-
-@if (ShowRequestId)
+@if (ShowTenantError)
+{
+<div class="alert alert-warning">
+    <strong>Tenant Not Found:</strong> The requested tenant does not exist or is not accessible.
+</div>
+}
+else if (ShowRequestId)
 {
     <p>
         <strong>Request ID:</strong> <code>@RequestId</code>
@@ -25,12 +31,21 @@
 </p>
 
 @code{
+    private bool ShowTenantError { get; set; }
+
     [CascadingParameter]
     private HttpContext? HttpContext { get; set; }
 
     private string? RequestId { get; set; }
     private bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
 
-    protected override void OnInitialized() =>
+    protected override void OnInitialized()
+    {
         RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+
+        // Check if error parameter is "NoTenantFound"
+        var uri = new Uri(Navigation.Uri);
+        var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        ShowTenantError = queryParams["error"] == "NoTenantFound";
+    }
 }

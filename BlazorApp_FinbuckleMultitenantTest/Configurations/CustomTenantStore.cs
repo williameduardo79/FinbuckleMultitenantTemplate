@@ -4,16 +4,19 @@ using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
 using BlazorApp_FinbuckleMultitenantTest.Data;
 using Finbuckle.MultiTenant.Abstractions;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace BlazorApp_FinbuckleMultitenantTest.TenantData
 {
     public class CustomTenantStore : IMultiTenantStore<AppTenantInfo>
     {
         private readonly ApplicationDbContext _dbContext;
-
-        public CustomTenantStore(ApplicationDbContext dbContext)
+        private readonly IMemoryCache _cache;
+        private readonly string _cacheKey = "CachedTenants"; // Key for storing tenants in memory
+        public CustomTenantStore(ApplicationDbContext dbContext, IMemoryCache cache)
         {
             _dbContext = dbContext;
+            _cache = cache;
         }
 
         /// <summary>
@@ -26,6 +29,10 @@ namespace BlazorApp_FinbuckleMultitenantTest.TenantData
 
             _dbContext.Tenants.Add(tenantInfo);
             var result = await _dbContext.SaveChangesAsync();
+
+            if (result > 0)
+                _cache.Remove(_cacheKey); // Invalidate cache after adding a tenant
+
             return result > 0; // Return true if at least one row was affected
         }
 
@@ -39,6 +46,10 @@ namespace BlazorApp_FinbuckleMultitenantTest.TenantData
 
             _dbContext.Tenants.Update(tenantInfo);
             var result = await _dbContext.SaveChangesAsync();
+
+            if (result > 0)
+                _cache.Remove(_cacheKey); // Invalidate cache after updating a tenant
+
             return result > 0; // Return true if at least one row was affected
         }
 
@@ -55,6 +66,10 @@ namespace BlazorApp_FinbuckleMultitenantTest.TenantData
 
             _dbContext.Tenants.Remove(tenantInfo);
             var result = await _dbContext.SaveChangesAsync();
+
+            if (result > 0)
+                _cache.Remove(_cacheKey); // Invalidate cache after updating a tenant
+
             return result > 0; // Return true if at least one row was affected
         }
 
@@ -64,8 +79,8 @@ namespace BlazorApp_FinbuckleMultitenantTest.TenantData
         [Obsolete("Use TryGetByIdentifierAsync instead.")]
         public async Task<AppTenantInfo?> TryGetAsync(string id)
         {
-            return await _dbContext.Tenants
-                .FirstOrDefaultAsync(t => t.Id == id);
+            var tenants = await GetTenantsFromCache(); // Await the Task to get IQueryable
+            return tenants.FirstOrDefault(t => t.Id == id);
         }
 
         /// <summary>
@@ -73,8 +88,8 @@ namespace BlazorApp_FinbuckleMultitenantTest.TenantData
         /// </summary>
         public async Task<AppTenantInfo?> TryGetByIdentifierAsync(string identifier)
         {
-            return await _dbContext.Tenants
-                .FirstOrDefaultAsync(t => t.Identifier == identifier);
+            var tenants = await GetTenantsFromCache(); // Await the Task to get IQueryable
+            return tenants.FirstOrDefault(t => t.Identifier == identifier);
         }
 
         /// <summary>
@@ -82,8 +97,23 @@ namespace BlazorApp_FinbuckleMultitenantTest.TenantData
         /// </summary>
         public async Task<IEnumerable<AppTenantInfo>> GetAllAsync()
         {
-            return await _dbContext.Tenants
-                .ToListAsync();
+            var tenants = await GetTenantsFromCache();
+            return tenants;
+        }
+        /// <summary>
+        /// Retrieves tenants from cache or database if not cached.
+        /// </summary>
+        private async Task<List<AppTenantInfo>> GetTenantsFromCache()
+        {
+            if (!_cache.TryGetValue(_cacheKey, out List<AppTenantInfo>? tenants))
+            {
+                tenants = await _dbContext.Tenants.ToListAsync();
+
+                // Cache the tenants with a 10-minute expiration
+                _cache.Set(_cacheKey, tenants, TimeSpan.FromMinutes(10));
+            }
+
+            return tenants;
         }
     }
 
