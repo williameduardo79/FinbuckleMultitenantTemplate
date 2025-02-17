@@ -217,6 +217,7 @@ static async Task CreateRolesAsync(IServiceProvider serviceProvider, IConfigurat
             {
                 UserName = adminUserName,
                 Email = adminEmail
+                
             };
 
             var createUser = await userManager.CreateAsync(adminUser, adminPassword);

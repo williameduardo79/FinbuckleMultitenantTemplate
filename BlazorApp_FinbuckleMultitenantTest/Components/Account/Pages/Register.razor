@@ -3,6 +3,7 @@
 @using System.ComponentModel.DataAnnotations
 @using System.Text
 @using System.Text.Encodings.Web
+@using BlazorApp_FinbuckleMultitenantTest.Configurations
 @using BlazorApp_FinbuckleMultitenantTest.Services
 @using Finbuckle.MultiTenant.Abstractions
 @using Microsoft.AspNetCore.Identity
@@ -15,7 +16,7 @@
 
 
 
-@inject UserManager<ApplicationUser> UserManager
+@inject TenantUserManager UserManager
 @inject IUserStore<ApplicationUser> UserStore
 @inject SignInManager<ApplicationUser> SignInManager
 @inject IEmailSender<ApplicationUser> EmailSender
@@ -78,7 +79,12 @@
 
     public async Task RegisterUser(EditContext editContext)
     {
-        var user = CreateUser();
+        var user = new ApplicationUser
+            {
+                UserName = Input.Email,
+                Email = Input.Email
+                
+            };
 
         await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
         var emailStore = GetEmailStore();

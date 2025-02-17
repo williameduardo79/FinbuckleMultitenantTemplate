@@ -1,0 +1,69 @@
+﻿@page "/tenant/update/{tenantId?}"
+@using BlazorApp_FinbuckleMultitenantTest.Data
+@using Finbuckle.MultiTenant.Abstractions
+@inject IMultiTenantStore<AppTenantInfo> TenantService
+@inject NavigationManager Navigation
+
+<h4>@(Tenant.Id == null ? "Add Tenant" : "Edit Tenant")</h4>
+
+<EditForm Model="Tenant" OnValidSubmit="SaveTenant">
+    <DataAnnotationsValidator />
+    <div class="mb-3">
+        <label>Identifier</label>
+        <InputText class="form-control" @bind-Value="Tenant.Identifier" />
+    </div>
+    <div class="mb-3">
+        <label>Name</label>
+        <InputText class="form-control" @bind-Value="Tenant.Name" />
+    </div>
+    <div class="mb-3">
+        <label>Address</label>
+        <InputText class="form-control" @bind-Value="Tenant.TenantAddress" />
+    </div>
+    <div class="mb-3">
+        <label>Connection String</label>
+        <InputText class="form-control" @bind-Value="Tenant.ConnectionString" />
+    </div>
+    <div class="mb-3">
+        <label>Main Tenant</label>
+        <InputCheckbox class="form-check-input" @bind-Value="Tenant.IsMainTenant" />
+    </div>
+    <button type="submit" class="btn btn-success">Save</button>
+    <button type="button" class="btn btn-secondary" @onclick="CancelEdit">Cancel</button>
+</EditForm>
+
+@code {
+    [Parameter] public string? TenantId { get; set; }
+    private AppTenantInfo Tenant = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(TenantId))
+        {
+            var existingTenant = await TenantService.TryGetByIdentifierAsync(TenantId);
+            if (existingTenant != null)
+            {
+                Tenant = existingTenant;
+            }
+        }
+    }
+
+    private async Task SaveTenant()
+    {
+        if (string.IsNullOrEmpty(Tenant.Id))
+        {
+            Tenant.Id = Guid.NewGuid().ToString();
+            await TenantService.TryAddAsync(Tenant);
+        }
+        else
+        {
+            await TenantService.TryUpdateAsync(Tenant);
+        }
+        Navigation.NavigateTo("/tenant/management");
+    }
+
+    private void CancelEdit()
+    {
+        Navigation.NavigateTo("/tenant/management");
+    }
+}

@@ -38,20 +38,22 @@
                 <span class="bi bi-lock-nav-menu" aria-hidden="true"></span> Auth Required
             </NavLink>
         </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="select-tenant">
-                <span class="bi bi-buildings" aria-hidden="true"></span> Select Tenant
-            </NavLink>
-        </div>
+       
         <AuthorizeView>
             <Authorized>
                 @if (context.User.IsInRole("TenantsAdmin") && (tenant?.IsMainTenant ?? false))
                 {
                     <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="tenant/usertenants">
-                            <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> User Tenant Management
+                        <NavLink class="nav-link" href="tenant/management">
+                            <span class="bi bi-building" aria-hidden="true"></span> Tenants
                         </NavLink>
                     </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="tenant/usertenants">
+                            <span class="bi bi-people" aria-hidden="true"></span> User Management
+                        </NavLink>
+                    </div>
+                   
                 }
 
 

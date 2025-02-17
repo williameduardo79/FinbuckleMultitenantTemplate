@@ -1,0 +1,84 @@
+﻿@page "/tenant/management"
+@using BlazorApp_FinbuckleMultitenantTest.Data
+@using Finbuckle.MultiTenant.Abstractions
+
+@inject NavigationManager Navigation
+@inject IMultiTenantStore<AppTenantInfo> TenantService
+
+<h3>Tenant Management</h3>
+
+@if (isLoading)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Identifier</th>
+                <th>Name</th>
+                <th>Address</th>
+                <th>Is Main</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var tenant in Tenants)
+            {
+                <tr>
+                    <td>@tenant.Id</td>
+                    <td>@tenant.Identifier</td>
+                    <td>@tenant.Name</td>
+                    <td><a href="@($"{scheme}://{tenant.TenantAddress}{port}/")">@tenant.TenantAddress</a> </td>
+                    <td>@tenant.IsMainTenant</td>
+                    <td>
+                        <button class="btn btn-warning" @onclick="() => EditTenant(tenant.Id)">Edit</button>
+                        <button class="btn btn-danger" @onclick="() => DeleteTenant(tenant.Identifier)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<button class="btn btn-primary" @onclick="AddTenant">Add Tenant</button>
+
+@code {
+    private List<AppTenantInfo> Tenants = new();
+    private bool isLoading = true;
+    private string scheme = "http";
+    private string port = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = new Uri(Navigation.BaseUri);
+        scheme = uri.Scheme;
+        port = uri.IsDefaultPort ? "" : $":{uri.Port}";
+        await LoadTenants();
+    }
+
+    public async Task LoadTenants()
+    {
+        isLoading = true;
+        Tenants = (await TenantService.GetAllAsync()).ToList();
+        isLoading = false;
+    }
+
+    private void EditTenant(string tenantId)
+    {
+        Navigation.NavigateTo($"/tenant/update/{tenantId}");
+    }
+
+    private void AddTenant()
+    {
+        Navigation.NavigateTo("/tenant/update");
+    }
+
+    private async Task DeleteTenant(string identifier)
+    {
+        var result = await TenantService.TryRemoveAsync(identifier);
+        if (result) await LoadTenants();
+    }
+}
