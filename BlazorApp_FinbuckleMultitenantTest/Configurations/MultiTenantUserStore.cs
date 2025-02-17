@@ -4,10 +4,11 @@ using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Finbuckle.MultiTenant.Abstractions;
+using BlazorApp_FinbuckleMultitenantTest.Data;
 
-namespace BlazorApp_FinbuckleMultitenantTest.Data
+namespace BlazorApp_FinbuckleMultitenantTest.Configurations
 {
-    public class MultiTenantUserStore : UserStore<ApplicationUser, IdentityRole, ApplicationDbContext, string>
+    public class MultiTenantUserStore : UserStore<ApplicationUser, TenantRole, ApplicationDbContext, string>
     {
         private readonly IHttpContextAccessor _httpContextAccessor;
 
@@ -73,5 +74,44 @@ namespace BlazorApp_FinbuckleMultitenantTest.Data
 
             await Context.SaveChangesAsync(cancellationToken);
         }
+        public override async Task<IList<string>> GetRolesAsync(ApplicationUser user, CancellationToken cancellationToken = default)
+        {
+            if (user == null) throw new ArgumentNullException(nameof(user));
+
+            var tenantInfo = _httpContextAccessor.HttpContext?.GetTenantInfo<AppTenantInfo>();
+            if (tenantInfo == null) throw new InvalidOperationException("Tenant info is null");
+
+            // Query only roles for the current tenant
+            var roles = await Context.UserTenantRoles
+                .Where(utr => utr.UserId == user.Id && utr.TenantId == tenantInfo.Id)
+                .Select(utr => utr.Role.Name)
+                .ToListAsync(cancellationToken);
+
+            return roles;
+        }
+        public override async Task AddToRoleAsync(ApplicationUser user, string roleName, CancellationToken cancellationToken = default)
+        {
+            if (user == null) throw new ArgumentNullException(nameof(user));
+
+            var tenantInfo = _httpContextAccessor.HttpContext?.GetTenantInfo<AppTenantInfo>();
+            if (tenantInfo == null) throw new InvalidOperationException("Tenant info is null");
+
+            var role = await Context.TenantRoles
+                .Where(r => r.Name == roleName && r.TenantId == tenantInfo.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (role == null) throw new InvalidOperationException($"Role '{roleName}' not found for tenant '{tenantInfo.Id}'");
+
+            var userRole = new UserTenantRole
+            {
+                UserId = user.Id,
+                TenantId = tenantInfo.Id,
+                RoleId = role.Id
+            };
+
+            Context.UserTenantRoles.Add(userRole);
+            await Context.SaveChangesAsync(cancellationToken);
+        }
+
     }
 }

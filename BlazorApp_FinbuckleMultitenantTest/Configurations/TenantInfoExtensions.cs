@@ -1,6 +1,7 @@
-﻿using Finbuckle.MultiTenant.Abstractions;
+﻿using BlazorApp_FinbuckleMultitenantTest.Data;
+using Finbuckle.MultiTenant.Abstractions;
 
-namespace BlazorApp_FinbuckleMultitenantTest.Data
+namespace BlazorApp_FinbuckleMultitenantTest.Configurations
 {
     public static class TenantInfoExtensions
     {

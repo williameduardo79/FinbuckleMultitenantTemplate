@@ -7,8 +7,8 @@ using Microsoft.AspNetCore.Identity;
 
 namespace BlazorApp_FinbuckleMultitenantTest.Data
 {
-    public class ApplicationDbContext : MultiTenantIdentityDbContext<ApplicationUser, IdentityRole, string,
-    ApplicationUserClaim, IdentityUserRole<string>, IdentityUserLogin<string>, IdentityRoleClaim<string>, IdentityUserToken<string>>
+    public class ApplicationDbContext : MultiTenantIdentityDbContext<ApplicationUser, TenantRole, string,
+    ApplicationUserClaim, UserTenantRole, IdentityUserLogin<string>, IdentityRoleClaim<string>, IdentityUserToken<string>>
     {
         public ApplicationDbContext(IMultiTenantContextAccessor multiTenantContextAccessor, DbContextOptions<ApplicationDbContext> options)
             : base(multiTenantContextAccessor, options)
@@ -17,10 +17,18 @@ namespace BlazorApp_FinbuckleMultitenantTest.Data
         public DbSet<AppTenantInfo> Tenants { get; set; }
         public DbSet<UserTenant> UserTenants { get; set; }
         public DbSet<ApplicationUserClaim> UserClaims { get; set; }
+        public DbSet<UserTenantRole> UserTenantRoles { get; set; }
+
+        public DbSet<TenantRole> TenantRoles { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<AppTenantInfo>()
+           .HasIndex(t => t.IsMainTenant)
+           .IsUnique()
+           .HasFilter("[IsMainTenant] = 1"); // Works for SQL Server, modify for other databases
 
             // Configure relationships
             modelBuilder.Entity<UserTenant>()
@@ -48,6 +56,27 @@ namespace BlazorApp_FinbuckleMultitenantTest.Data
             // Override IdentityUserClaim with ApplicationUserClaim
             modelBuilder.Entity<ApplicationUserClaim>()
                 .ToTable("AspNetUserClaims");
+
+            // Define Composite Key for UserTenantRole and specify foreign keys explicitly
+            modelBuilder.Entity<UserTenantRole>()
+                .HasKey(utr => new { utr.UserId, utr.RoleId, utr.TenantId });
+
+            // Explicitly define the foreign key relationships for UserTenantRole
+            modelBuilder.Entity<UserTenantRole>()
+                .HasOne(utr => utr.User)
+                .WithMany()
+                .HasForeignKey(utr => utr.UserId)
+                .OnDelete(DeleteBehavior.Restrict);  // Prevent cascading deletes
+
+            modelBuilder.Entity<UserTenantRole>()
+                .HasOne(utr => utr.Role)
+                .WithMany()
+                .HasForeignKey(utr => utr.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);  // Prevent cascading deletes
+
+            // Ensure Roles are linked to Tenant
+            modelBuilder.Entity<TenantRole>()
+                .HasIndex(r => new { r.TenantId, r.Name }).IsUnique();
         }
     }
 

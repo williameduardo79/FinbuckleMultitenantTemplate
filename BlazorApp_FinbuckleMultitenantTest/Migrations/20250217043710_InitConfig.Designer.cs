@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BlazorApp_FinbuckleMultitenantTest.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250215194310_TenantAddress")]
-    partial class TenantAddress
+    [Migration("20250217043710_InitConfig")]
+    partial class InitConfig
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -38,6 +38,9 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("IsMainTenant")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -47,6 +50,10 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("IsMainTenant")
+                        .IsUnique()
+                        .HasFilter("[IsMainTenant] = 1");
 
                     b.ToTable("Tenants");
                 });
@@ -145,7 +152,7 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
                     b.ToTable("AspNetUserClaims", (string)null);
                 });
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
+            modelBuilder.Entity("BlazorApp_FinbuckleMultitenantTest.Data.TenantRole", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
@@ -162,6 +169,10 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("NormalizedName")
@@ -169,7 +180,29 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
                         .HasDatabaseName("RoleNameIndex")
                         .HasFilter("[NormalizedName] IS NOT NULL");
 
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique()
+                        .HasFilter("[Name] IS NOT NULL");
+
                     b.ToTable("AspNetRoles", (string)null);
+                });
+
+            modelBuilder.Entity("BlazorApp_FinbuckleMultitenantTest.Data.UserTenantRole", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("RoleId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("TenantId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("UserId", "RoleId", "TenantId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("AspNetUserRoles", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -219,21 +252,6 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
                     b.ToTable("AspNetUserLogins", (string)null);
                 });
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<string>", b =>
-                {
-                    b.Property<string>("UserId")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("RoleId")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("UserId", "RoleId");
-
-                    b.HasIndex("RoleId");
-
-                    b.ToTable("AspNetUserRoles", (string)null);
-                });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
                 {
                     b.Property<string>("UserId")
@@ -261,7 +279,13 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
                     b.Property<string>("TenantId")
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("RoleId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
                     b.HasKey("UserId", "TenantId");
+
+                    b.HasIndex("RoleId");
 
                     b.HasIndex("TenantId");
 
@@ -277,9 +301,28 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("BlazorApp_FinbuckleMultitenantTest.Data.UserTenantRole", b =>
+                {
+                    b.HasOne("BlazorApp_FinbuckleMultitenantTest.Data.TenantRole", "Role")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BlazorApp_FinbuckleMultitenantTest.Data.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
-                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
+                    b.HasOne("BlazorApp_FinbuckleMultitenantTest.Data.TenantRole", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -288,21 +331,6 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
                 {
-                    b.HasOne("BlazorApp_FinbuckleMultitenantTest.Data.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<string>", b =>
-                {
-                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
-                        .WithMany()
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("BlazorApp_FinbuckleMultitenantTest.Data.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -321,6 +349,12 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
 
             modelBuilder.Entity("UserTenant", b =>
                 {
+                    b.HasOne("BlazorApp_FinbuckleMultitenantTest.Data.TenantRole", "Role")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("BlazorApp_FinbuckleMultitenantTest.Data.AppTenantInfo", "Tenant")
                         .WithMany("UserTenants")
                         .HasForeignKey("TenantId")
@@ -332,6 +366,8 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Role");
 
                     b.Navigation("Tenant");
 

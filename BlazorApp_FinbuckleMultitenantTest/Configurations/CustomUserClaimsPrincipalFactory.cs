@@ -1,20 +1,29 @@
-﻿using Finbuckle.MultiTenant.Abstractions;
+﻿using BlazorApp_FinbuckleMultitenantTest.Data;
+using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
 
-namespace BlazorApp_FinbuckleMultitenantTest.Data
+namespace BlazorApp_FinbuckleMultitenantTest.Configurations
 {
     using Finbuckle.MultiTenant; // Make sure you have this using statement
 
     public class CustomUserClaimsPrincipalFactory : UserClaimsPrincipalFactory<ApplicationUser>
     {
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IMultiTenantContextAccessor _tenantAccessor;
+        private readonly TenantUserManager _userManager;
 
-        public CustomUserClaimsPrincipalFactory(UserManager<ApplicationUser> userManager, IOptions<IdentityOptions> optionsAccessor, IHttpContextAccessor httpContextAccessor)
-            : base(userManager, optionsAccessor)
+        public CustomUserClaimsPrincipalFactory(
+     TenantUserManager userManager,
+     IOptions<IdentityOptions> optionsAccessor,
+     IHttpContextAccessor httpContextAccessor,
+     IMultiTenantContextAccessor tenantAccessor)
+     : base(userManager, optionsAccessor)
         {
             _httpContextAccessor = httpContextAccessor;
+            _tenantAccessor = tenantAccessor;
+            _userManager = userManager; // Assign the user manager properly
         }
 
         public override async Task<ClaimsPrincipal> CreateAsync(ApplicationUser user)
@@ -38,6 +47,22 @@ namespace BlazorApp_FinbuckleMultitenantTest.Data
             }
 
             return principal;
+        }
+        protected override async Task<ClaimsIdentity> GenerateClaimsAsync(ApplicationUser user)
+        {
+            var identity = await base.GenerateClaimsAsync(user);
+
+            var tenantId = _tenantAccessor.MultiTenantContext?.TenantInfo?.Id;
+            if (tenantId != null)
+            {
+                var roles = await _userManager.GetRolesAsync(user);
+                foreach (var role in roles)
+                {
+                    identity.AddClaim(new Claim(ClaimTypes.Role, role));
+                }
+            }
+
+            return identity;
         }
     }
 }

@@ -1,0 +1,124 @@
+﻿@page "/tenant/usertenantupdate/{UserId?}/{TenantId?}"
+@using BlazorApp_FinbuckleMultitenantTest.Data
+@using BlazorApp_FinbuckleMultitenantTest.Services
+@using Finbuckle.MultiTenant.Abstractions
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject IUserTenantService UserTenantService
+@inject IMultiTenantStore<AppTenantInfo> TenantService
+@inject UserManager<ApplicationUser> UserManager
+@inject RoleManager<TenantRole> RoleManager
+@inject NavigationManager Navigation
+
+<h3>@(IsEditMode ? "Edit User-Tenant" : "Create User-Tenant")</h3>
+
+@if (userTenant == null || tenants == null || roles == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <EditForm Model="userTenant" OnValidSubmit="SaveUserTenant">
+        <DataAnnotationsValidator />
+
+        <!-- User ID (Non-editable) -->
+        <div class="mb-3">
+            <label class="form-label">User ID</label>
+            <InputText class="form-control" @bind-Value="userTenant.UserId" disabled />
+        </div>
+
+        <!-- Username (Non-editable) -->
+        <div class="mb-3">
+            <label class="form-label">Username</label>
+            <InputText class="form-control" @bind-Value="userName" disabled />
+        </div>
+
+        <!-- Tenant Selection (Dropdown) -->
+        <div class="mb-3">
+            <label class="form-label">Tenant</label>
+            <InputSelect class="form-control" @bind-Value="userTenant.TenantId">
+                @foreach (var tenant in tenants)
+                {
+                    <option value="@tenant.Id">@tenant.Name</option>
+                }
+            </InputSelect>
+        </div>
+
+        <!-- Role Selection (Dropdown) -->
+        <div class="mb-3">
+            <label class="form-label">Role</label>
+            <InputSelect class="form-control" @bind-Value="selectedRole">
+                @foreach (var role in roles)
+                {
+                    <option value="@role">@role</option>
+                }
+            </InputSelect>
+        </div>
+
+        <button type="submit" class="btn btn-success">Save</button>
+        <button type="button" @onclick="Cancel" class="btn btn-secondary">Cancel</button>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public string? UserId { get; set; }
+    [Parameter] public string? TenantId { get; set; }
+
+    private UserTenant userTenant = new();
+    private string userName = string.Empty;
+    private List<AppTenantInfo> tenants = new();
+    private List<string> roles = new();
+    private string selectedRole = string.Empty;
+    private bool IsEditMode => !string.IsNullOrEmpty(UserId) && !string.IsNullOrEmpty(TenantId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsEditMode)
+        {
+            userTenant = await UserTenantService.GetUserTenantAsync(UserId, TenantId) ?? new UserTenant();
+
+            // Fetch username
+            var user = await UserManager.FindByIdAsync(UserId);
+            if (user != null)
+            {
+                userName = user.UserName;
+                var userRoles = await UserManager.GetRolesAsync(user);
+                selectedRole = userRoles.FirstOrDefault() ?? "";
+            }
+        }
+
+        // Load available tenants
+        tenants = (await TenantService.GetAllAsync()).ToList();
+
+        // Load roles
+        roles = (await RoleManager.Roles.Select(r => r.Name).ToListAsync());
+    }
+
+    private async Task SaveUserTenant()
+    {
+        if (IsEditMode)
+        {
+            await UserTenantService.UpdateUserTenantAsync(userTenant);
+        }
+        else
+        {
+            await UserTenantService.CreateUserTenantAsync(userTenant);
+        }
+
+        // Assign role
+        var user = await UserManager.FindByIdAsync(userTenant.UserId);
+        if (user != null)
+        {
+            var currentRoles = await UserManager.GetRolesAsync(user);
+            await UserManager.RemoveFromRolesAsync(user, currentRoles);
+            await UserManager.AddToRoleAsync(user, selectedRole);
+        }
+
+        Navigation.NavigateTo("/tenant/usertenants");
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/tenant/usertenants");
+    }
+}

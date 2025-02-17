@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace BlazorApp_FinbuckleMultitenantTest.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class InitConfig : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -16,6 +16,7 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    TenantId = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     NormalizedName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     ConcurrencyStamp = table.Column<string>(type: "nvarchar(max)", nullable: true)
@@ -57,7 +58,9 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
                     Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     Identifier = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    ConnectionString = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    ConnectionString = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TenantAddress = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsMainTenant = table.Column<bool>(type: "bit", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -132,23 +135,24 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
                 columns: table => new
                 {
                     UserId = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    RoleId = table.Column<string>(type: "nvarchar(450)", nullable: false)
+                    RoleId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    TenantId = table.Column<string>(type: "nvarchar(450)", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_AspNetUserRoles", x => new { x.UserId, x.RoleId });
+                    table.PrimaryKey("PK_AspNetUserRoles", x => new { x.UserId, x.RoleId, x.TenantId });
                     table.ForeignKey(
                         name: "FK_AspNetUserRoles_AspNetRoles_RoleId",
                         column: x => x.RoleId,
                         principalTable: "AspNetRoles",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_AspNetUserRoles_AspNetUsers_UserId",
                         column: x => x.UserId,
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -177,11 +181,17 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
                 {
                     UserId = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     TenantId = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    Id = table.Column<int>(type: "int", nullable: false)
+                    RoleId = table.Column<string>(type: "nvarchar(450)", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_UserTenants", x => new { x.UserId, x.TenantId });
+                    table.ForeignKey(
+                        name: "FK_UserTenants_AspNetRoles_RoleId",
+                        column: x => x.RoleId,
+                        principalTable: "AspNetRoles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_UserTenants_AspNetUsers_UserId",
                         column: x => x.UserId,
@@ -200,6 +210,13 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
                 name: "IX_AspNetRoleClaims_RoleId",
                 table: "AspNetRoleClaims",
                 column: "RoleId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AspNetRoles_TenantId_Name",
+                table: "AspNetRoles",
+                columns: new[] { "TenantId", "Name" },
+                unique: true,
+                filter: "[Name] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "RoleNameIndex",
@@ -234,6 +251,18 @@ namespace BlazorApp_FinbuckleMultitenantTest.Migrations
                 column: "NormalizedUserName",
                 unique: true,
                 filter: "[NormalizedUserName] IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Tenants_IsMainTenant",
+                table: "Tenants",
+                column: "IsMainTenant",
+                unique: true,
+                filter: "[IsMainTenant] = 1");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserTenants_RoleId",
+                table: "UserTenants",
+                column: "RoleId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_UserTenants_TenantId",

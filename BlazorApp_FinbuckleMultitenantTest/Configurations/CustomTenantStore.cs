@@ -6,7 +6,7 @@ using BlazorApp_FinbuckleMultitenantTest.Data;
 using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.Extensions.Caching.Memory;
 
-namespace BlazorApp_FinbuckleMultitenantTest.TenantData
+namespace BlazorApp_FinbuckleMultitenantTest.Configurations
 {
     public class CustomTenantStore : IMultiTenantStore<AppTenantInfo>
     {

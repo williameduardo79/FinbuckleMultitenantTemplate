@@ -1,11 +1,14 @@
 ﻿@page "/auth"
 
+@using BlazorApp_FinbuckleMultitenantTest.Configurations
 @using BlazorApp_FinbuckleMultitenantTest.Data
 @using BlazorApp_FinbuckleMultitenantTest.TenantData
 @using Finbuckle.MultiTenant.Abstractions
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @inject IMultiTenantContextAccessor<AppTenantInfo> _tenantAccessor
+@inject TenantUserManager _userManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @attribute [Authorize]
 
 <PageTitle>Auth</PageTitle>
@@ -13,12 +16,23 @@
 <h1>You are authenticated</h1>
 
 <AuthorizeView>
-    Hello @context.User.Identity?.Name!
+    Hello @context.User.Identity?.Name! 
+    <h4>Claims</h4>
+    <ul>
+        @foreach (var claim in context.User.Claims)
+        {
+            <li>@claim.Issuer: @claim.Type = @claim.Value | @claim.Subject</li>
+        }
+    </ul>
 
     <br />
-    You are in tenant @_tenantAccessor.MultiTenantContext.TenantInfo?.Name!
+    You are in tenant @_tenantAccessor.MultiTenantContext.TenantInfo?.Name! Main: @_tenantAccessor.MultiTenantContext.TenantInfo?.IsMainTenant
     <br />
     Connection String: @_tenantAccessor.MultiTenantContext.TenantInfo?.ConnectionString
+    <br />
+    Auth State Role: TenantsAdmin = @isInRole
+    <br />
+    Context Role: TenantsAdmin = @context.User.IsInRole("TenantsAdmin")
     <br />
     <h2>Products:</h2>
     @if (products == null)
@@ -53,11 +67,22 @@
 </AuthorizeView>
 @code{
     private Product[]? products;
+    private bool isInRole = false;
+
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = await _userManager.GetUserAsync(authState.User); // Get ApplicationUser
+
+        if (user != null)
+        {
+            isInRole = await _userManager.IsInRoleAsync(user, "TenantsAdmin");
+           
+        }
         var tenant = _tenantAccessor.MultiTenantContext.TenantInfo;
         if(tenant != null)
         {
+            
             var connectionString = tenant.ConnectionString;
             // Use the tenant connection string to create the TenantDbContext
             var optionsBuilder = new DbContextOptionsBuilder<TenantDbContext>()

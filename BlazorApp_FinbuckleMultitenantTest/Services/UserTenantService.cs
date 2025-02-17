@@ -12,13 +12,14 @@ namespace BlazorApp_FinbuckleMultitenantTest.Services
             _dbContext = dbContext;
         }
 
-        // Get a single UserTenant by Id
-        public async Task<UserTenant> GetUserTenantAsync(string userId, string tenantId)
+        // Get a single UserTenant by composite key
+        public async Task<UserTenant?> GetUserTenantAsync(string userId, string tenantId)
         {
             return await _dbContext.UserTenants
                 .Include(ut => ut.User)
                 .Include(ut => ut.Tenant)
-                 .FirstOrDefaultAsync(ut => ut.UserId == userId && ut.TenantId == tenantId);
+                .Include(ut => ut.Role)
+                .FirstOrDefaultAsync(ut => ut.UserId == userId && ut.TenantId == tenantId);
         }
 
         // Get all UserTenants
@@ -27,6 +28,7 @@ namespace BlazorApp_FinbuckleMultitenantTest.Services
             return await _dbContext.UserTenants
                 .Include(ut => ut.User)
                 .Include(ut => ut.Tenant)
+                .Include(ut => ut.Role)
                 .ToListAsync();
         }
 
@@ -41,15 +43,25 @@ namespace BlazorApp_FinbuckleMultitenantTest.Services
         // Update an existing UserTenant
         public async Task<UserTenant> UpdateUserTenantAsync(UserTenant userTenant)
         {
-            _dbContext.UserTenants.Update(userTenant);
+            var existingUserTenant = await _dbContext.UserTenants
+                .FirstOrDefaultAsync(ut => ut.UserId == userTenant.UserId && ut.TenantId == userTenant.TenantId);
+
+            if (existingUserTenant == null)
+            {
+                throw new InvalidOperationException("User-Tenant not found.");
+            }
+
+            _dbContext.Entry(existingUserTenant).CurrentValues.SetValues(userTenant);
             await _dbContext.SaveChangesAsync();
             return userTenant;
         }
 
-        // Delete a UserTenant by Id
-        public async Task<bool> DeleteUserTenantAsync(int id)
+        // Delete a UserTenant by composite key
+        public async Task<bool> DeleteUserTenantAsync(string userId, string tenantId)
         {
-            var userTenant = await _dbContext.UserTenants.FindAsync(id);
+            var userTenant = await _dbContext.UserTenants
+                .FirstOrDefaultAsync(ut => ut.UserId == userId && ut.TenantId == tenantId);
+
             if (userTenant == null)
             {
                 return false;

@@ -12,4 +12,8 @@ public class UserTenant
     public string TenantId { get; set; } = default!;
     [ForeignKey("TenantId")]
     public virtual AppTenantInfo Tenant { get; set; } = default!;
+
+    public string RoleId { get; set; } = default!;
+    [ForeignKey("RoleId")]
+    public virtual TenantRole Role { get; set; } = default!;
 }

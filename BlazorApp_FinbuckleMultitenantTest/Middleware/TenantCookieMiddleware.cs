@@ -14,9 +14,7 @@ namespace BlazorApp_FinbuckleMultitenantTest.Middleware
 
         public async Task Invoke(HttpContext context, IMultiTenantContextAccessor multiTenantContext)
         {
-            
- 
-            var tenantInfo = multiTenantContext.MultiTenantContext?.TenantInfo;
+             var tenantInfo = multiTenantContext.MultiTenantContext?.TenantInfo;
             if (tenantInfo != null)
             {
                 var cookieName = $".AspNetCore.Identity.{tenantInfo.Identifier}";
@@ -46,8 +44,6 @@ namespace BlazorApp_FinbuckleMultitenantTest.Middleware
             }
            
            
-            
-
             await _next(context);
         }
     }

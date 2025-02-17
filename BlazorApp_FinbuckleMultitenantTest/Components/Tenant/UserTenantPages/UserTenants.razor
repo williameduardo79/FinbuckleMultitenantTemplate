@@ -1,0 +1,69 @@
+﻿@page "/tenant/usertenants"
+@using BlazorApp_FinbuckleMultitenantTest.Services
+
+@inject IUserTenantService UserTenantService
+@inject NavigationManager Navigation
+
+<h3>User-Tenants</h3>
+
+@if (userTenants == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>User</th>
+                <th>Tenant</th>
+                <th>Role</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var ut in userTenants)
+            {
+                <tr>
+                    <td>@ut.User.Email</td>
+                    <td>@ut.Tenant.Name</td>
+                    <td>@ut.Role?.Name</td>
+                    <td>
+                        <button @onclick="() => EditUserTenant(ut.UserId, ut.TenantId)" class="btn btn-primary">Edit</button>
+                        <button @onclick="() => DeleteUserTenant(ut.UserId, ut.TenantId)" class="btn btn-danger">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <button @onclick="CreateUserTenant" class="btn btn-success">Add User-Tenant</button>
+}
+
+@code {
+    private List<UserTenant> userTenants = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        userTenants = await UserTenantService.GetAllUserTenantsAsync();
+    }
+
+    private void CreateUserTenant()
+    {
+        Navigation.NavigateTo("/tenant/usertenantupdate");
+    }
+
+    private void EditUserTenant(string userId, string tenantId)
+    {
+        Navigation.NavigateTo($"/tenant/usertenantupdate/{userId}/{tenantId}");
+    }
+
+    private async Task DeleteUserTenant(string userId, string tenantId)
+    {
+        if (await UserTenantService.DeleteUserTenantAsync(userId, tenantId))
+        {
+            userTenants = await UserTenantService.GetAllUserTenantsAsync();
+            StateHasChanged();
+        }
+    }
+}
