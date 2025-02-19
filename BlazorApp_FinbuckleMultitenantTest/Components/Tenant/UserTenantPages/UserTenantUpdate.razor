@@ -2,6 +2,7 @@
 @using BlazorApp_FinbuckleMultitenantTest.Data
 @using BlazorApp_FinbuckleMultitenantTest.Services
 @using Finbuckle.MultiTenant.Abstractions
+@using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.EntityFrameworkCore
 @inject IUserTenantService UserTenantService
@@ -9,6 +10,7 @@
 @inject UserManager<ApplicationUser> UserManager
 @inject RoleManager<TenantRole> RoleManager
 @inject NavigationManager Navigation
+@attribute [Authorize(Roles = "TenantsAdmin")]
 
 <h3>@(IsEditMode ? "Edit User-Tenant" : "Create User-Tenant")</h3>
 
@@ -33,10 +35,10 @@ else
             <InputText class="form-control" @bind-Value="userName" disabled />
         </div>
 
-        <!-- Tenant Selection (Dropdown) -->
+        <!-- Tenant Selection (Editable if only UserId is passed) -->
         <div class="mb-3">
             <label class="form-label">Tenant</label>
-            <InputSelect class="form-control" @bind-Value="userTenant.TenantId">
+            <InputSelect class="form-control" @bind-Value="userTenant.TenantId" disabled="@(!IsEditMode && string.IsNullOrEmpty(UserId))">
                 @foreach (var tenant in tenants)
                 {
                     <option value="@tenant.Id">@tenant.Name</option>
@@ -44,10 +46,10 @@ else
             </InputSelect>
         </div>
 
-        <!-- Role Selection (Dropdown) -->
+        <!-- Role Selection (Editable if UserId is passed) -->
         <div class="mb-3">
             <label class="form-label">Role</label>
-            <InputSelect class="form-control" @bind-Value="selectedRole">
+            <InputSelect class="form-control" @bind-Value="selectedRole" disabled="@(IsRoleEditable ? null : "disabled")">
                 @foreach (var role in roles)
                 {
                     <option value="@role">@role</option>
@@ -69,33 +71,43 @@ else
     private List<AppTenantInfo> tenants = new();
     private List<string> roles = new();
     private string selectedRole = string.Empty;
+
     private bool IsEditMode => !string.IsNullOrEmpty(UserId) && !string.IsNullOrEmpty(TenantId);
+    private bool IsRoleEditable => !string.IsNullOrEmpty(UserId);  // Role is editable if UserId is provided
 
     protected override async Task OnInitializedAsync()
     {
         if (IsEditMode)
         {
+            // Edit Mode: Fetch the existing UserTenant relationship
             userTenant = await UserTenantService.GetUserTenantAsync(UserId, TenantId) ?? new UserTenant();
 
-            // Fetch username
+            // Fetch username from UserManager
             var user = await UserManager.FindByIdAsync(UserId);
             if (user != null)
             {
                 userName = user.UserName;
+
+                // Get the user's roles
                 var userRoles = await UserManager.GetRolesAsync(user);
                 selectedRole = userRoles.FirstOrDefault() ?? "";
             }
         }
+        else if (!string.IsNullOrEmpty(UserId)) // If only UserId is passed, load the user details
+        {
+            userTenant = new UserTenant { UserId = UserId };
+        }
 
-        // Load available tenants
+        // Load available tenants (for selection, even if it's read-only in edit mode)
         tenants = (await TenantService.GetAllAsync()).ToList();
 
-        // Load roles
+        // Load roles for the dropdown
         roles = (await RoleManager.Roles.Select(r => r.Name).ToListAsync());
     }
 
     private async Task SaveUserTenant()
     {
+        // Create or Update the UserTenant relationship
         if (IsEditMode)
         {
             await UserTenantService.UpdateUserTenantAsync(userTenant);
@@ -105,7 +117,7 @@ else
             await UserTenantService.CreateUserTenantAsync(userTenant);
         }
 
-        // Assign role
+        // Assign the role to the user
         var user = await UserManager.FindByIdAsync(userTenant.UserId);
         if (user != null)
         {
@@ -114,6 +126,7 @@ else
             await UserManager.AddToRoleAsync(user, selectedRole);
         }
 
+        // Redirect to user tenants list
         Navigation.NavigateTo("/tenant/usertenants");
     }
 

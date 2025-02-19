@@ -1,9 +1,11 @@
 ﻿@page "/tenant/management"
 @using BlazorApp_FinbuckleMultitenantTest.Data
 @using Finbuckle.MultiTenant.Abstractions
+@using Microsoft.AspNetCore.Authorization
 
 @inject NavigationManager Navigation
 @inject IMultiTenantStore<AppTenantInfo> TenantService
+@attribute [Authorize(Roles = "TenantsAdmin")]
 
 <h3>Tenant Management</h3>
 

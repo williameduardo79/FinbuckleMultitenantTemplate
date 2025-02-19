@@ -12,5 +12,7 @@ namespace BlazorApp_FinbuckleMultitenantTest.Data
 
         [ForeignKey("RoleId")]
         public virtual TenantRole Role { get; set; } = default!;
+        [ForeignKey("TenantId")]
+        public virtual AppTenantInfo Tenant { get; set; } = default!;
     }
 }

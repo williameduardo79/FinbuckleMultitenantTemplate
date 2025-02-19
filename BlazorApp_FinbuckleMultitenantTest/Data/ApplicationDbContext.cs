@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Identity;
 namespace BlazorApp_FinbuckleMultitenantTest.Data
 {
     public class ApplicationDbContext : MultiTenantIdentityDbContext<ApplicationUser, TenantRole, string,
-    ApplicationUserClaim, UserTenantRole, IdentityUserLogin<string>, IdentityRoleClaim<string>, IdentityUserToken<string>>
+    IdentityUserClaim<string>, UserTenantRole, IdentityUserLogin<string>, IdentityRoleClaim<string>, IdentityUserToken<string>>
     {
         public ApplicationDbContext(IMultiTenantContextAccessor multiTenantContextAccessor, DbContextOptions<ApplicationDbContext> options)
             : base(multiTenantContextAccessor, options)
@@ -25,58 +25,64 @@ namespace BlazorApp_FinbuckleMultitenantTest.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            modelBuilder.Entity<TenantRole>()
+          .HasIndex(r => new { r.TenantId, r.Name })
+          .IsUnique();
+
+            // Configure AppTenantInfo - Index for IsMainTenant field
             modelBuilder.Entity<AppTenantInfo>()
-           .HasIndex(t => t.IsMainTenant)
-           .IsUnique()
-           .HasFilter("[IsMainTenant] = 1"); // Works for SQL Server, modify for other databases
+                .HasIndex(t => t.IsMainTenant)
+                .IsUnique()
+                .HasFilter("[IsMainTenant] = 1"); // Modify as needed for your DB provider
 
-            // Configure relationships
-            modelBuilder.Entity<UserTenant>()
-                .HasKey(ut => new { ut.UserId, ut.TenantId });
-
-            modelBuilder.Entity<UserTenant>()
-                .HasOne(ut => ut.User)
-                .WithMany(u => u.UserTenants)
-                .HasForeignKey(ut => ut.UserId);
-
-            modelBuilder.Entity<UserTenant>()
-                .HasOne(ut => ut.Tenant)
-                .WithMany(t => t.UserTenants)
-                .HasForeignKey(ut => ut.TenantId);
-
-            //Ensure TenantId is required in the claims table
-            modelBuilder.Entity<ApplicationUserClaim>()
-                .Property(uc => uc.TenantId)
-                .IsRequired();
-
-            // Index for faster multi-tenant lookups
-            modelBuilder.Entity<ApplicationUserClaim>()
-                .HasIndex(uc => new { uc.UserId, uc.TenantId });
-
-            // Override IdentityUserClaim with ApplicationUserClaim
-            modelBuilder.Entity<ApplicationUserClaim>()
-                .ToTable("AspNetUserClaims");
-
-            // Define Composite Key for UserTenantRole and specify foreign keys explicitly
+            // Configure relationships for UserTenantRole (User -> Tenant -> Role)
             modelBuilder.Entity<UserTenantRole>()
-                .HasKey(utr => new { utr.UserId, utr.RoleId, utr.TenantId });
+                .HasKey(utr => new { utr.UserId, utr.TenantId, utr.RoleId });
 
-            // Explicitly define the foreign key relationships for UserTenantRole
             modelBuilder.Entity<UserTenantRole>()
                 .HasOne(utr => utr.User)
                 .WithMany()
                 .HasForeignKey(utr => utr.UserId)
-                .OnDelete(DeleteBehavior.Restrict);  // Prevent cascading deletes
+                .OnDelete(DeleteBehavior.Restrict); // Prevent cascading deletes
 
             modelBuilder.Entity<UserTenantRole>()
                 .HasOne(utr => utr.Role)
                 .WithMany()
                 .HasForeignKey(utr => utr.RoleId)
-                .OnDelete(DeleteBehavior.Restrict);  // Prevent cascading deletes
+                .OnDelete(DeleteBehavior.Restrict); // Prevent cascading deletes
 
-            // Ensure Roles are linked to Tenant
+            // Ensure TenantId is included in the UserTenantRole relation
+            modelBuilder.Entity<UserTenantRole>()
+                .HasOne(utr => utr.Tenant)
+                .WithMany()
+                .HasForeignKey(utr => utr.TenantId)
+                .OnDelete(DeleteBehavior.Restrict); // Prevent cascading deletes
+
+           
+
+            // Configure UserTenantRole to include TenantRole (Role -> Tenant)
             modelBuilder.Entity<TenantRole>()
-                .HasIndex(r => new { r.TenantId, r.Name }).IsUnique();
+                .HasIndex(r => new { r.TenantId, r.Name })
+                .IsUnique(); // Ensure roles are unique per tenant
+
+            // Explicitly map the ApplicationUserClaim entity
+            modelBuilder.Entity<ApplicationUserClaim>()
+                .ToTable("IdentityUserClaims");
+
+            modelBuilder.Entity<UserTenant>()
+       .HasKey(ut => new { ut.UserId, ut.TenantId });
+
+            modelBuilder.Entity<UserTenant>()
+                .HasOne(ut => ut.User)
+                .WithMany()
+                .HasForeignKey(ut => ut.UserId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<UserTenant>()
+                .HasOne(ut => ut.Tenant)
+                .WithMany()
+                .HasForeignKey(ut => ut.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 

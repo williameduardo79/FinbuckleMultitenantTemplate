@@ -1,6 +1,7 @@
 ﻿@page "/Account/Login"
 
 @using System.ComponentModel.DataAnnotations
+@using BlazorApp_FinbuckleMultitenantTest.Services
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Identity
 @using BlazorApp_FinbuckleMultitenantTest.Data
@@ -15,6 +16,7 @@
 @inject IMultiTenantContextAccessor<AppTenantInfo> _tenantContext;
 @inject UserManager<ApplicationUser> _userManager
 @inject IHttpContextAccessor _httpContextAccessor
+@inject IUserTenantService _userTenant
 
 <PageTitle>Log in</PageTitle>
 
@@ -100,12 +102,9 @@
             return;
         }
 
-        // Find user by email AND tenant
-        var user = await _userManager.Users
-            .Include(u => u.UserTenants)
-            .Where(u => u.NormalizedEmail == Input.Email.ToUpper() &&
-                        u.UserTenants.Any(ut => ut.TenantId == tenantInfo.Id))
-            .FirstOrDefaultAsync();
+        // Find user by email
+        var user = await _userManager.FindByEmailAsync(Input.Email);
+
 
         if (user == null)
         {
@@ -113,8 +112,13 @@
             return;
         }
 
-        // var claims = await _userManager.GetClaimsAsync(user);
-        // Logger.LogInformation("Claims for user: " + string.Join(", ", claims.Select(c => c.Type)));
+        // Check if user is associated with the current tenant
+        var userTenant = await _userTenant.GetUserTenantAsync(user.Id, tenantInfo.Id);
+        if (userTenant == null)
+        {
+            Console.WriteLine($"⚠️ User {Input.Email} is not part of tenant {tenantInfo.Identifier}.");
+            return;
+        }
 
         if (_signInManager == null)
         {

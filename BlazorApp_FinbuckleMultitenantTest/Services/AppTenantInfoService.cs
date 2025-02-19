@@ -21,7 +21,7 @@ namespace BlazorApp_FinbuckleMultitenantTest.Services
         public async Task<List<AppTenantInfo>> GetAllAsync()
         {
             return await _context.Tenants
-                .Include(t => t.UserTenants)
+               
                 .ToListAsync();
         }
 
@@ -31,7 +31,7 @@ namespace BlazorApp_FinbuckleMultitenantTest.Services
         public async Task<AppTenantInfo?> GetByIdAsync(string id)
         {
             return await _context.Tenants
-                .Include(t => t.UserTenants)
+                
                 .FirstOrDefaultAsync(t => t.Id == id);
         }
 

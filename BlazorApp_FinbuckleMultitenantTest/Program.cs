@@ -54,6 +54,7 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
     // Other Identity options
     options.ClaimsIdentity.RoleClaimType = ClaimTypes.Role;
 })
+    .AddClaimsPrincipalFactory<CustomUserClaimsPrincipalFactory>()
     .AddRoles<TenantRole>() // 🔹 Add this to specify role type
     .AddEntityFrameworkStores<ApplicationDbContext>() //Ensures EF Core stores roles
     .AddSignInManager<SignInManager<ApplicationUser>>() //Adds SignInManager
@@ -63,8 +64,10 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
     .AddDefaultTokenProviders(); //Ensures token support (e.g., for password reset)
 
 
-builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, CustomUserClaimsPrincipalFactory>();
-builder.Services.AddScoped<IUserStore<ApplicationUser>, MultiTenantUserStore>();
+//builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, CustomUserClaimsPrincipalFactory>();
+builder.Services.AddScoped<MultiTenantUserStore>();
+builder.Services.AddScoped<TenantUserManager>(); // Register TenantUserManager as Scoped
+
 
 
 
@@ -81,6 +84,8 @@ builder.Services.AddMultiTenant<AppTenantInfo>()
 
 
 builder.Services.AddScoped<IUserTenantService, UserTenantService>();
+//views
+builder.Services.AddScoped<UserTenantRoleService>(); // Register UserTenantRoleService as Scoped
 //builder.Services.AddScoped<IAppTenantInfoService, AppTenantInfoService>();
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
@@ -132,36 +137,14 @@ using (var scope = app.Services.CreateScope())
     var configuration = services.GetRequiredService<IConfiguration>();
     await CreateRolesAsync(services, configuration);
 }
-app.Use(async (context, next) =>
-{
-    using var scope = context.RequestServices.CreateScope();
-    var services = scope.ServiceProvider;
 
-    var userManager = services.GetRequiredService<TenantUserManager>();
-    var tenantContext = services.GetRequiredService<IMultiTenantContextAccessor<AppTenantInfo>>();
-    var configuration = services.GetRequiredService<IConfiguration>();
-
-    var currentTenantId = tenantContext.MultiTenantContext?.TenantInfo?.Id;
-    var adminEmail = configuration["AdminSettings:UserEmail"];
-    var mainTenantAdmin = configuration["AdminSettings:MainTenantsRole"];
-
-    if (!string.IsNullOrEmpty(currentTenantId))
-    {
-        var adminUser = await userManager.FindByEmailAsync(adminEmail);
-        if (adminUser != null && !await userManager.IsInRoleAsync(adminUser, mainTenantAdmin))
-        {
-            await userManager.AddToRoleAsync(adminUser, mainTenantAdmin);
-        }
-    }
-
-    await next();
-});
 
 app.Run();
 
 static async Task CreateRolesAsync(IServiceProvider serviceProvider, IConfiguration configuration)
 {
-    var mainTenantAdmin = configuration["AdminSettings:MainTenantsRole"];
+    var mainTenantAdmin = ApplicationVariables.MainTenantsRole;
+    var mainTenantId = configuration["AdminSettings:MainTenantId"];
     // Retrieve required services
     var multiTenantStore = serviceProvider.GetRequiredService<IMultiTenantStore<AppTenantInfo>>();
     var roleManager = serviceProvider.GetRequiredService<RoleManager<TenantRole>>();
@@ -170,15 +153,15 @@ static async Task CreateRolesAsync(IServiceProvider serviceProvider, IConfigurat
 
     // Step 1: Ensure the Main Tenant Exists
     var mainTenant = (await multiTenantStore.GetAllAsync()).SingleOrDefault(x => x.IsMainTenant);
-
-    if (mainTenant == null)
+   
+    if (mainTenant == null || mainTenantId == null)
     {
         mainTenant = new AppTenantInfo
         {
             Id = Guid.NewGuid().ToString(),
-            Identifier = "localhost",
+            Identifier = mainTenantId,
             Name = "Main Tenant",
-            TenantAddress = "localhost",
+            TenantAddress = mainTenantId,
             ConnectionString = @"Server=(localdb)\mssqllocaldb;Database=aspnet-BlazorApp_FinbuckleMultitenantTest-MainTenant;Trusted_Connection=True;MultipleActiveResultSets=true",
             IsMainTenant = true
         };
@@ -219,8 +202,8 @@ static async Task CreateRolesAsync(IServiceProvider serviceProvider, IConfigurat
                 Email = adminEmail
                 
             };
-
-            var createUser = await userManager.CreateAsync(adminUser, adminPassword);
+     
+            var createUser = await userManager.CreateWithTenantAsync(adminUser, adminPassword, mainTenant);
             if (!createUser.Succeeded)
             {
                 Console.WriteLine($"Error creating {mainTenantAdmin}: {string.Join(", ", createUser.Errors.Select(e => e.Description))}");
@@ -232,28 +215,13 @@ static async Task CreateRolesAsync(IServiceProvider serviceProvider, IConfigurat
             adminUser = existingUser;
         }
 
-        // Step 4: Ensure Admin User is Assigned to Tenant
-        var existingUserTenant = (await userTenantService.GetAllUserTenantsAsync())
-            .FirstOrDefault(ut => ut.UserId == adminUser.Id && ut.TenantId == mainTenant.Id);
-
-        if (existingUserTenant == null)
+        
+            
+        if (adminUser != null && !await userManager.IsInRoleAsync(adminUser, mainTenantAdmin, mainTenant.Id))
         {
-            var adminRole = await roleManager.FindByNameAsync(mainTenantAdmin);
-            if (adminRole == null)
-            {
-                Console.WriteLine("Admin role not found!");
-                return;
-            }
-            var userTenant = new UserTenant
-            {
-                UserId = adminUser.Id,
-                TenantId = mainTenant.Id,
-                RoleId = adminRole.Id // Ensure RoleId is set
-            };
-            await userTenantService.CreateUserTenantAsync(userTenant);
+            await userManager.AddToRoleAsync(adminUser, mainTenantAdmin, mainTenant.Id);
         }
-       
-       
+
     }
 }
 

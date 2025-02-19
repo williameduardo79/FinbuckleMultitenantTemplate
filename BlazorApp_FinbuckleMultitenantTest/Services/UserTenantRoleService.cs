@@ -1,4 +1,6 @@
-﻿using BlazorApp_FinbuckleMultitenantTest.Data;
+﻿using BlazorApp_FinbuckleMultitenantTest.Configurations;
+using BlazorApp_FinbuckleMultitenantTest.Data;
+using BlazorApp_FinbuckleMultitenantTest.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,10 +10,10 @@ namespace BlazorApp_FinbuckleMultitenantTest.Services
     public class UserTenantRoleService
     {
         private readonly ApplicationDbContext _dbContext;
-        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly TenantUserManager _userManager;
         private readonly RoleManager<TenantRole> _roleManager;
 
-        public UserTenantRoleService(ApplicationDbContext dbContext, UserManager<ApplicationUser> userManager, RoleManager<TenantRole> roleManager)
+        public UserTenantRoleService(ApplicationDbContext dbContext, TenantUserManager userManager, RoleManager<TenantRole> roleManager)
         {
             _dbContext = dbContext;
             _userManager = userManager;
@@ -72,5 +74,53 @@ namespace BlazorApp_FinbuckleMultitenantTest.Services
             await _dbContext.SaveChangesAsync();
             return true;
         }
+        public async Task<List<UserTenantRoleDTO>> GetAllUserTenantsWithRoles()
+        {
+            var userTenantRoles = await (
+                from u in _dbContext.Users
+                join ut in _dbContext.UserTenants on u.Id equals ut.UserId into userTenants
+                from ut in userTenants.DefaultIfEmpty() // Left join to include users without tenants
+                join t in _dbContext.Tenants on ut.TenantId equals t.Id into tenants
+                from t in tenants.DefaultIfEmpty() // Left join to include users without tenants
+                join ur in _dbContext.UserTenantRoles on new { ut.UserId, ut.TenantId } equals new { ur.UserId, ur.TenantId } into userRoles
+                from ur in userRoles.DefaultIfEmpty() // Left join to include users without roles
+                join r in _dbContext.Roles on ur.RoleId equals r.Id into roles
+                from r in roles.DefaultIfEmpty() // Left join to include tenants without roles
+                select new
+                {
+                    User = u,
+                    Tenant = ut,
+                    TenantInfo = t,
+                    Role = r
+                }
+            ).ToListAsync();
+
+            var groupedUsers = userTenantRoles
+                .GroupBy(ur => ur.User.Id)
+                .Select(g => new UserTenantRoleDTO
+                {
+                    UserId = g.Key,
+                    user = g.First().User, // Get the user object
+                    TenantRoleDTOs = g.GroupBy(ut => ut.Tenant?.TenantId) // Group by TenantId
+                        .Where(ut => ut.Key != null) // Ignore users without tenants
+                        .Select(ut => new TenantRoleDTO
+                        {
+                            TenantId = ut.Key!,
+                            UserWithTenant = ut.First().Tenant!, // User-Tenant relationship
+                            UserTenantRoles = ut
+                                .Where(utr => utr.Role != null) // Ignore if no roles
+                                .Select(utr => new UserTenantRole
+                                {
+                                    UserId = utr.User.Id,
+                                    TenantId = utr.Tenant!.TenantId,
+                                    Role = utr.Role!
+                                }).ToList()
+                        }).ToList()
+                }).ToList();
+
+            return groupedUsers;
+        }
+
+
     }
 }

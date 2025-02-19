@@ -1,9 +1,10 @@
 ﻿@page "/tenant/update/{tenantId?}"
 @using BlazorApp_FinbuckleMultitenantTest.Data
 @using Finbuckle.MultiTenant.Abstractions
+@using Microsoft.AspNetCore.Authorization
 @inject IMultiTenantStore<AppTenantInfo> TenantService
 @inject NavigationManager Navigation
-
+@attribute [Authorize(Roles = "TenantsAdmin")]
 <h4>@(Tenant.Id == null ? "Add Tenant" : "Edit Tenant")</h4>
 
 <EditForm Model="Tenant" OnValidSubmit="SaveTenant">

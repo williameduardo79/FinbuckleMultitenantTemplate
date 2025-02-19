@@ -7,8 +7,6 @@ namespace BlazorApp_FinbuckleMultitenantTest.Data
    
     public class ApplicationUser : IdentityUser
     {
-       
-        public virtual ICollection<UserTenant> UserTenants { get; set; } = new List<UserTenant>();
     }
 
 }

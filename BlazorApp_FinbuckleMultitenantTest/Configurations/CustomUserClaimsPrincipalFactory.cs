@@ -8,7 +8,7 @@ namespace BlazorApp_FinbuckleMultitenantTest.Configurations
 {
     using Finbuckle.MultiTenant; // Make sure you have this using statement
 
-    public class CustomUserClaimsPrincipalFactory : UserClaimsPrincipalFactory<ApplicationUser>
+    public class CustomUserClaimsPrincipalFactory : UserClaimsPrincipalFactory<ApplicationUser, TenantRole>
     {
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IMultiTenantContextAccessor _tenantAccessor;
@@ -16,10 +16,11 @@ namespace BlazorApp_FinbuckleMultitenantTest.Configurations
 
         public CustomUserClaimsPrincipalFactory(
      TenantUserManager userManager,
+     RoleManager<TenantRole> roleManager,
      IOptions<IdentityOptions> optionsAccessor,
      IHttpContextAccessor httpContextAccessor,
      IMultiTenantContextAccessor tenantAccessor)
-     : base(userManager, optionsAccessor)
+     : base(userManager,roleManager, optionsAccessor)
         {
             _httpContextAccessor = httpContextAccessor;
             _tenantAccessor = tenantAccessor;

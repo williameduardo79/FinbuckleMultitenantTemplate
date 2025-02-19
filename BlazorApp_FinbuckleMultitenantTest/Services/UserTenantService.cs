@@ -18,7 +18,7 @@ namespace BlazorApp_FinbuckleMultitenantTest.Services
             return await _dbContext.UserTenants
                 .Include(ut => ut.User)
                 .Include(ut => ut.Tenant)
-                .Include(ut => ut.Role)
+                
                 .FirstOrDefaultAsync(ut => ut.UserId == userId && ut.TenantId == tenantId);
         }
 
@@ -28,7 +28,7 @@ namespace BlazorApp_FinbuckleMultitenantTest.Services
             return await _dbContext.UserTenants
                 .Include(ut => ut.User)
                 .Include(ut => ut.Tenant)
-                .Include(ut => ut.Role)
+               
                 .ToListAsync();
         }
 

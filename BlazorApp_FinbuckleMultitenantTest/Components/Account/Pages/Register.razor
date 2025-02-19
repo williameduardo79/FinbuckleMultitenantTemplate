@@ -17,7 +17,7 @@
 
 
 @inject TenantUserManager UserManager
-@inject IUserStore<ApplicationUser> UserStore
+@inject MultiTenantUserStore UserStore
 @inject SignInManager<ApplicationUser> SignInManager
 @inject IEmailSender<ApplicationUser> EmailSender
 @inject ILogger<Register> Logger
@@ -25,7 +25,6 @@
 @inject IdentityRedirectManager RedirectManager
 @inject IMultiTenantContextAccessor<AppTenantInfo> _tenantAccessor
 @inject IHttpContextAccessor httpContextAccessor
-@inject IUserTenantService tenantService
 
 <PageTitle>Register</PageTitle>
 
@@ -79,20 +78,11 @@
 
     public async Task RegisterUser(EditContext editContext)
     {
-        var user = new ApplicationUser
-            {
-                UserName = Input.Email,
-                Email = Input.Email
-                
-            };
+        var user = CreateUser();
 
         await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
         var emailStore = GetEmailStore();
         await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
-
-
-
-
         var result = await UserManager.CreateAsync(user, Input.Password);
 
         if (!result.Succeeded)
@@ -118,82 +108,8 @@
                 "Account/RegisterConfirmation",
                 new() { ["email"] = Input.Email, ["returnUrl"] = ReturnUrl });
         }
-        if (SignInManager == null)
-        {
-            Console.WriteLine("SigninManager is null");
-        }
 
-       
-        //await SignInManager.SignInAsync(existingUser, isPersistent: false);
-
-        // var principal = await SignInManager.CreateUserPrincipalAsync(existingUser);
-        // var httpContext = httpContextAccessor.HttpContext;
-
-        // if (httpContext != null)
-        // {
-        //     await httpContext.SignInAsync(IdentityConstants.ApplicationScheme, principal, new AuthenticationProperties { IsPersistent = true });
-        // }
-        // else
-        // {
-        //     throw new Exception("HttpContext is null. Ensure IHttpContextAccessor is registered.");
-        // }
-        var tenantInfo = _tenantAccessor.MultiTenantContext.TenantInfo;
-        
-
-        if (tenantInfo != null)
-        {
-            
-            UserTenant userTenant = new UserTenant()
-                {
-                    UserId = user.Id,
-                    User = user,
-                    TenantId = tenantInfo.Id,
-                    Tenant = tenantInfo
-                };
-
-
-            //await tenantService.CreateUserTenantAsync(userTenant);
-
-            var existingUser = await UserManager.FindByEmailAsync(user.Email);
-            if (existingUser == null)
-            {
-                throw new Exception("User not found.");
-            }
-            if (SignInManager == null)
-                throw new Exception("SignInManager is null");
-
-            if (SignInManager.Context == null)
-                throw new Exception("HttpContext is null in SignInManager");
-
-            if (SignInManager.ClaimsFactory == null)
-                throw new Exception("UserClaimsPrincipalFactory is null in SignInManager");
-
-            if (UserManager == null)
-                throw new Exception("UserManager is null in SignInManager");
-
-
-            var principal = await SignInManager.ClaimsFactory.CreateAsync(existingUser);
-            if (principal == null)
-                throw new Exception("Failed to create ClaimsPrincipal for user.");
-
-            //await SignInManager.PasswordSignInAsync(user, Input.Password, false, lockoutOnFailure: false);
-            
-            await SignInManager.SignInAsync(user, isPersistent: false);
-        }
-       
-        
-        
-
-        // var principal = await SignInManager.CreateUserPrincipalAsync(user);
-        // await HttpContext.SignInAsync(IdentityConstants.ApplicationScheme, principal);
-
-        // Optionally, you can sign the user in with the tenant-specific claims if needed
-    //     var userClaimsPrincipal = await SignInManager.CreateUserPrincipalAsync(user);
-    //     userClaimsPrincipal.AddIdentity(new ClaimsIdentity(new[]
-    //     {
-    //     new Claim("tenant_id", tenantInfo?.Id ?? ""),
-    //     new Claim("tenant_name", tenantInfo?.Identifier ?? "")
-    // }));
+        await SignInManager.SignInAsync(user, isPersistent: false);
         RedirectManager.RedirectTo(ReturnUrl);
     }
 

@@ -1,8 +1,18 @@
 ﻿@page "/tenant/usertenants"
+@using BlazorApp_FinbuckleMultitenantTest.Configurations
+@using BlazorApp_FinbuckleMultitenantTest.Data
+@using BlazorApp_FinbuckleMultitenantTest.Models
 @using BlazorApp_FinbuckleMultitenantTest.Services
+@using Finbuckle.MultiTenant.Abstractions
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
 
 @inject IUserTenantService UserTenantService
 @inject NavigationManager Navigation
+@inject UserTenantRoleService tenantRoleService
+
+
+@attribute [Authorize(Roles = "TenantsAdmin")]
 
 <h3>User-Tenants</h3>
 
@@ -16,8 +26,7 @@ else
         <thead>
             <tr>
                 <th>User</th>
-                <th>Tenant</th>
-                <th>Role</th>
+                <th>Tenants & Roles</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -25,12 +34,44 @@ else
             @foreach (var ut in userTenants)
             {
                 <tr>
-                    <td>@ut.User.Email</td>
-                    <td>@ut.Tenant.Name</td>
-                    <td>@ut.Role?.Name</td>
+                    <td>@ut.user.Email</td>
                     <td>
-                        <button @onclick="() => EditUserTenant(ut.UserId, ut.TenantId)" class="btn btn-primary">Edit</button>
-                        <button @onclick="() => DeleteUserTenant(ut.UserId, ut.TenantId)" class="btn btn-danger">Delete</button>
+                        @if (ut.TenantRoleDTOs != null && ut.TenantRoleDTOs.Any())
+                        {
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Tenant</th>
+                                        <th>Roles</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var tenantRole in ut.TenantRoleDTOs)
+                                    {
+                                        <tr>
+                                            <td>@tenantRole.UserWithTenant.Tenant.Name</td>
+                                            <td>
+                                                @(tenantRole.UserTenantRoles?.Any() ?? false
+                                                    ? string.Join(", ", tenantRole.UserTenantRoles.Select(r => r.Role.Name))
+                                                    : "No Roles")
+                                            </td>
+                                            <td>
+                                                <button @onclick="() => EditUserTenant(ut.UserId, tenantRole.TenantId)" class="btn btn-primary btn-sm">Edit</button>
+                                                <button @onclick="() => DeleteUserTenant(ut.UserId, tenantRole.TenantId)" class="btn btn-danger btn-sm">Delete</button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <p>No tenants assigned</p>
+                        }
+                    </td>
+                    <td>
+                        <button @onclick="() => UpdateTenant(ut.UserId)" class="btn btn-success btn-sm">Add Tenant</button>
                     </td>
                 </tr>
             }
@@ -41,16 +82,22 @@ else
 }
 
 @code {
-    private List<UserTenant> userTenants = new();
+    private List<UserTenantRoleDTO> userTenants = new();
 
     protected override async Task OnInitializedAsync()
     {
-        userTenants = await UserTenantService.GetAllUserTenantsAsync();
+        userTenants = await tenantRoleService.GetAllUserTenantsWithRoles();
+       
+        //var userTenantRole = await UserManager.GetRolesAsync()
     }
 
     private void CreateUserTenant()
     {
         Navigation.NavigateTo("/tenant/usertenantupdate");
+    }
+    private void UpdateTenant(string userId)
+    {
+        Navigation.NavigateTo($"/tenant/usertenantupdate/{userId}");
     }
 
     private void EditUserTenant(string userId, string tenantId)
@@ -62,7 +109,7 @@ else
     {
         if (await UserTenantService.DeleteUserTenantAsync(userId, tenantId))
         {
-            userTenants = await UserTenantService.GetAllUserTenantsAsync();
+            userTenants = await tenantRoleService.GetAllUserTenantsWithRoles();
             StateHasChanged();
         }
     }

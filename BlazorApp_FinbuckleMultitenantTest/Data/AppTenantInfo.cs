@@ -10,6 +10,6 @@ namespace BlazorApp_FinbuckleMultitenantTest.Data
         public string ConnectionString { get; set; } = default!;
         public string TenantAddress { get; set; } = default!;
         public bool IsMainTenant { get; set; } = false;
-        public virtual ICollection<UserTenant> UserTenants { get; set; } = new List<UserTenant>();
+       
     }
 }
